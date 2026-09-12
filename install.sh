@@ -25,8 +25,11 @@ docker compose version >/dev/null 2>&1 \
 
 # When this script is piped from curl, stdin is the script itself, so any
 # prompting must go through the terminal directly.
-TTY=/dev/tty
-[ -r "$TTY" ] && [ -w "$TTY" ] || TTY=""
+# A readable/writable device node is not enough: with no controlling terminal
+# (CI, ssh without -t) opening /dev/tty fails with ENXIO even though the node
+# exists. Probe by actually opening it; with no terminal, prompts are skipped
+# and the environment variables are the only input.
+if ( : </dev/tty >/dev/tty ) 2>/dev/null; then TTY=/dev/tty; else TTY=""; fi
 
 # Print $1 as a prompt, read one line from the terminal with echo off.
 prompt_hidden() {
