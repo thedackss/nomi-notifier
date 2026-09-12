@@ -123,3 +123,7 @@ event shapes typed inline.
 - Your cookie and messages only travel between your machine, beta.nomi.ai,
   and the webhook URL you configure. Nothing else is contacted.
 - Keep `.env` private; it is gitignored and excluded from the Docker image.
+
+## License
+
+MIT. See `LICENSE`.
