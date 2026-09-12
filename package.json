@@ -1,0 +1,19 @@
+{
+    "name": "nomi-notifier",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Realtime bridge: forwards a Nomi's incoming messages (proactive included) to a webhook, over Nomi's Socket.IO channel.",
+    "scripts": {
+        "build": "tsc",
+        "typecheck": "tsc --noEmit",
+        "start": "node --env-file=.env dist/index.js"
+    },
+    "dependencies": {
+        "socket.io-client": "^4.8.1"
+    },
+    "devDependencies": {
+        "@types/node": "^24.10.1",
+        "typescript": "~5.9.3"
+    }
+}
