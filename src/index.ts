@@ -4,7 +4,8 @@
  * Nomi's web app receives messages over a Socket.IO connection (path /socket/
  * on beta.nomi.ai, authenticated by the session cookie). This process holds
  * that same connection open and, for every message a Nomi sends (proactive
- * ones included), POSTs a small JSON payload to NOMI_WEBHOOK_URL.
+ * ones included), POSTs a small JSON payload to NOMI_WEBHOOK_URL. With no
+ * webhook configured it runs in console mode and prints each message instead.
  *
  * It only observes. It never sends a message and never spends credits.
  */
@@ -14,7 +15,8 @@ import { io } from "socket.io-client";
 
 interface Config {
     sessionToken: string;
-    webhookUrl: string;
+    /** Where to POST each message. null = console mode (print to stdout). */
+    webhookUrl: string | null;
     /** Only forward messages from these Nomi ids (empty = all). */
     nomiIds: number[];
     /** Only forward proactive/scheduled messages, not replies. */
@@ -25,16 +27,15 @@ interface Config {
 
 function loadConfig(): Config {
     const sessionToken = process.env.NOMI_SESSION_TOKEN?.trim();
-    const webhookUrl = process.env.NOMI_WEBHOOK_URL?.trim();
-    if (!sessionToken || !webhookUrl) {
+    if (!sessionToken) {
         console.error(
-            "nomi-notifier: NOMI_SESSION_TOKEN and NOMI_WEBHOOK_URL are required (see .env.example).",
+            "nomi-notifier: NOMI_SESSION_TOKEN is required (see .env.example).",
         );
         process.exit(1);
     }
     return {
         sessionToken,
-        webhookUrl,
+        webhookUrl: process.env.NOMI_WEBHOOK_URL?.trim() || null,
         nomiIds: (process.env.NOMI_NOMI_IDS ?? "")
             .split(",")
             .map((s) => s.trim())
@@ -77,7 +78,7 @@ interface NomiChatEvent {
  */
 const MESSAGE_EVENTS = new Set(["nomiChatMessage", "nomiChatMessageUpdated"]);
 
-/** What gets POSTed to the webhook. */
+/** What gets POSTed to the webhook (or printed in console mode). */
 export interface WebhookPayload {
     nomiId: number;
     nomiName: string | null;
@@ -95,6 +96,7 @@ const BASE = "https://beta.nomi.ai";
 const config = loadConfig();
 const cookie = `__Secure-next-auth.session-token=${config.sessionToken}`;
 
+/** Diagnostics go to stderr; in console mode the messages themselves go to stdout. */
 function log(...args: unknown[]): void {
     console.error(new Date().toISOString(), ...args);
 }
@@ -120,16 +122,21 @@ async function loadNomiNames(): Promise<Map<number, string>> {
 }
 
 async function forward(payload: WebhookPayload): Promise<void> {
+    const who = payload.nomiName ?? String(payload.nomiId);
+    const kind = payload.proactive ? "proactive" : "reply";
+
+    if (!config.webhookUrl) {
+        // Console mode: no destination configured, print the message.
+        console.log(`[${who}] (${kind}) ${payload.text}`);
+        return;
+    }
     try {
         const res = await fetch(config.webhookUrl, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify(payload),
         });
-        log(
-            `forwarded ${payload.uuid} from ${payload.nomiName ?? payload.nomiId} ` +
-                `(${payload.proactive ? "proactive" : "reply"}) -> HTTP ${res.status}`,
-        );
+        log(`forwarded ${payload.uuid} from ${who} (${kind}) -> HTTP ${res.status}`);
     } catch (e) {
         log("webhook POST failed:", (e as Error).message);
     }
@@ -202,10 +209,13 @@ async function main(): Promise<void> {
         });
     }
 
+    const filters =
+        (config.proactiveOnly ? " (proactive only)" : "") +
+        (config.nomiIds.length ? ` for nomi(s) ${config.nomiIds.join(",")}` : "");
     log(
-        `nomi-notifier started -> ${config.webhookUrl}` +
-            (config.proactiveOnly ? " (proactive only)" : "") +
-            (config.nomiIds.length ? ` for nomi(s) ${config.nomiIds.join(",")}` : ""),
+        config.webhookUrl
+            ? `nomi-notifier started -> ${config.webhookUrl}${filters}`
+            : `nomi-notifier started in console mode (no NOMI_WEBHOOK_URL): messages print below${filters}`,
     );
 }
 
