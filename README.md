@@ -28,21 +28,49 @@ For each message a Nomi sends, one `POST` with a JSON body:
 proactive or scheduled message) and `false` when it is replying to you. Each
 message is delivered exactly once, with its finalized text.
 
-## Quick start (Docker, recommended)
+## Quick start (Docker image, recommended)
 
-You need Docker with Compose.
+No clone or build needed. A prebuilt image is published at
+`ghcr.io/thedackss/nomi-notifier`, multi-arch (amd64 and arm64), so it also
+runs on a Raspberry Pi. You need Docker with Compose.
 
-```bash
-cp .env.example .env      # then fill in NOMI_SESSION_TOKEN and NOMI_WEBHOOK_URL
-docker compose up -d
-docker compose logs -f    # watch it connect and forward
-```
+1. Create a folder with a `docker-compose.yml`:
+
+   ```yaml
+   services:
+     nomi-notifier:
+       image: ghcr.io/thedackss/nomi-notifier:latest
+       env_file: .env
+       restart: unless-stopped
+   ```
+
+2. Next to it, create `.env` with the two required values (see Configuration):
+
+   ```
+   NOMI_SESSION_TOKEN=your-cookie-value
+   NOMI_WEBHOOK_URL=https://your-webhook-endpoint
+   ```
+
+3. Start it:
+
+   ```bash
+   docker compose up -d
+   docker compose logs -f    # watch it connect and forward
+   ```
 
 That is the whole setup. The container restarts on its own and reconnects if
 the connection drops. No secrets are baked into the image; they come from your
 `.env` at run time.
 
-## Quick start (Node, no Docker)
+## Run from source (Docker)
+
+```bash
+git clone https://github.com/thedackss/nomi-notifier.git && cd nomi-notifier
+cp .env.example .env      # then fill in the two required values
+docker compose up -d      # builds the image locally
+```
+
+## Run from source (Node, no Docker)
 
 You need Node.js 20.6 or newer (it uses the built-in `--env-file`).
 
